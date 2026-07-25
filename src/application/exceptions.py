@@ -17,6 +17,10 @@ class AccountNumberGenerationError(ApplicationError):
     """Raised when a unique account number could not be generated."""
 
 
+class AccountNotFoundError(ApplicationError):
+    """Raised when a requested account does not exist."""
+
+
 class InvalidCredentialsError(ApplicationError):
     """Raised when authentication fails (unknown email or wrong password).
 

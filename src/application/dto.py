@@ -45,6 +45,15 @@ class AccountDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class BalanceDTO:
+    """Read-side projection returned by the GetBalance query."""
+
+    account_number: str
+    balance: Decimal
+    currency: str
+
+
+@dataclass(frozen=True, slots=True)
 class UserDTO:
     """Output of the RegisterUser use case.
 
