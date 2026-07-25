@@ -7,7 +7,7 @@ import sys
 
 import structlog
 
-from src.infrastructure.config import load_settings
+from infrastructure.config import load_settings
 
 config = load_settings()
 

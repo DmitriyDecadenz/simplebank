@@ -11,7 +11,8 @@ class TransactionRepository(ABC):
     """Persistence abstraction for the :class:`Transaction` entity.
 
     Transactions are an immutable ledger, hence only append/read operations are
-    exposed. Implementations are accessed through the :class:`UnitOfWork`.
+    exposed. Writes participate in the surrounding ``TransactionManager.atomic()``
+    block when one is active.
     """
 
     @abstractmethod

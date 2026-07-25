@@ -8,6 +8,7 @@ presentation layer never depends on the domain internals.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -51,6 +52,16 @@ class BalanceDTO:
     account_number: str
     balance: Decimal
     currency: str
+
+
+@dataclass(frozen=True, slots=True)
+class TransactionListItemDTO:
+    """Read-side projection of one transaction in an account's history."""
+
+    amount: Decimal
+    currency: str
+    type: str
+    created_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

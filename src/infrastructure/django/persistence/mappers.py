@@ -1,8 +1,8 @@
-"""Translation between SQLAlchemy models and domain objects.
+"""Translation between Django ORM models and domain objects.
 
-The domain layer is intentionally ignorant of the ORM, so these functions are
-the single place where the two representations meet. They contain no business
-logic: they only move data across the boundary and rebuild value objects.
+The single boundary where ORM and domain meet. No business logic: only data
+movement and value-object reconstruction. Foreign keys are read/written via the
+``*_id`` attributes to avoid triggering lazy (sync) relation loads in async code.
 """
 
 from __future__ import annotations
@@ -10,11 +10,12 @@ from __future__ import annotations
 from domain.entities.account import Account
 from domain.entities.transaction import Transaction
 from domain.entities.user import User
+from domain.enums.transaction_type import TransactionType
 from domain.value_objects.account_number import AccountNumber
 from domain.value_objects.email import Email
 from domain.value_objects.money import Money
 from domain.value_objects.password_hash import PasswordHash
-from infrastructure.database.sqlalchemy.models import (
+from infrastructure.django.apps.bank.models import (
     AccountModel,
     TransactionModel,
     UserModel,
@@ -61,7 +62,7 @@ def transaction_to_domain(model: TransactionModel) -> Transaction:
         id=model.id,
         account_id=model.account_id,
         amount=Money(model.amount, model.currency),
-        type=model.type,
+        type=TransactionType(model.type),
         created_at=model.created_at,
     )
 
@@ -72,6 +73,6 @@ def transaction_to_model(transaction: Transaction) -> TransactionModel:
         account_id=transaction.account_id,
         amount=transaction.amount.amount,
         currency=transaction.amount.currency,
-        type=transaction.type,
+        type=transaction.type.value,
         created_at=transaction.created_at,
     )

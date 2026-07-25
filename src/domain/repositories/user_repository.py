@@ -10,9 +10,8 @@ from domain.value_objects.email import Email
 class UserRepository(ABC):
     """Persistence abstraction for the :class:`User` aggregate.
 
-    Implementations live in the infrastructure layer. Instances are obtained
-    through the :class:`UnitOfWork` so every call participates in the same
-    transaction.
+    Implementations live in the infrastructure layer. Writes performed inside a
+    ``TransactionManager.atomic()`` block are committed together.
     """
 
     @abstractmethod

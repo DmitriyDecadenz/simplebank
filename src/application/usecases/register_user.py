@@ -1,7 +1,7 @@
 """RegisterUser use case.
 
-Registers a new user and, in the same transaction, opens an account for them
-credited with a welcome bonus.
+Registers a new user and, in the same atomic transaction, opens an account for
+them credited with a welcome bonus.
 """
 
 from __future__ import annotations
@@ -15,10 +15,13 @@ from application.exceptions import (
     AccountNumberGenerationError,
     EmailAlreadyExistsError,
 )
-from application.unit_of_work import AbstractUnitOfWork
+from application.transaction import TransactionManager
 from domain.entities.account import Account
 from domain.entities.user import User
 from domain.ports.password_hasher import PasswordHasher
+from domain.repositories.account_repository import AccountRepository
+from domain.repositories.transaction_repository import TransactionRepository
+from domain.repositories.user_repository import UserRepository
 from domain.value_objects.account_number import AccountNumber
 from domain.value_objects.email import Email
 from domain.value_objects.money import Money
@@ -33,40 +36,47 @@ class RegisterUser:
     """Create a user with an auto-opened, bonus-funded account."""
 
     def __init__(
-        self, uow: AbstractUnitOfWork, password_hasher: PasswordHasher
+        self,
+        users: UserRepository,
+        accounts: AccountRepository,
+        transactions: TransactionRepository,
+        password_hasher: PasswordHasher,
+        transaction_manager: TransactionManager,
     ) -> None:
-        self._uow = uow
+        self._users = users
+        self._accounts = accounts
+        self._transactions = transactions
         self._hasher = password_hasher
+        self._tx = transaction_manager
 
     async def execute(self, command: RegisterUserCommand) -> UserDTO:
         email = Email(command.email)
 
-        async with self._uow:
-            # Uniqueness check.
-            if await self._uow.users.exists_by_email(email):
-                raise EmailAlreadyExistsError(f"Email already registered: {email}")
+        # Uniqueness check.
+        if await self._users.exists_by_email(email):
+            raise EmailAlreadyExistsError(f"Email already registered: {email}")
 
-            # Hash the password and build the user.
-            password_hash = PasswordHash(self._hasher.hash(command.password))
-            user = User(id=uuid4(), email=email, password_hash=password_hash)
+        # Hash the password and build the user.
+        password_hash = PasswordHash(self._hasher.hash(command.password))
+        user = User(id=uuid4(), email=email, password_hash=password_hash)
 
-            # Generate a unique 10-digit account number and open the account.
-            account_number = await self._generate_account_number()
-            account = Account(
-                id=uuid4(),
-                owner_id=user.id,
-                account_number=account_number,
-                balance=Money.zero(_WELCOME_BONUS.currency),
-            )
+        # Generate a unique 10-digit account number and open the account.
+        account_number = await self._generate_account_number()
+        account = Account(
+            id=uuid4(),
+            owner_id=user.id,
+            account_number=account_number,
+            balance=Money.zero(_WELCOME_BONUS.currency),
+        )
 
-            # Credit the welcome bonus; the domain emits the CREDIT transaction.
-            transaction = account.deposit(_WELCOME_BONUS)
+        # Credit the welcome bonus; the domain emits the CREDIT transaction.
+        transaction = account.deposit(_WELCOME_BONUS)
 
-            # Persist everything atomically.
-            await self._uow.users.add(user)
-            await self._uow.accounts.add(account)
-            await self._uow.transactions.add(transaction)
-            await self._uow.commit()
+        # Persist everything atomically.
+        async with self._tx.atomic():
+            await self._users.add(user)
+            await self._accounts.add(account)
+            await self._transactions.add(transaction)
 
         return UserDTO(
             id=user.id,
@@ -87,7 +97,7 @@ class RegisterUser:
                 str(secrets.randbelow(10)) for _ in range(_ACCOUNT_NUMBER_DIGITS - 1)
             )
             candidate = AccountNumber(digits)
-            if await self._uow.accounts.get_by_number(candidate) is None:
+            if await self._accounts.get_by_number(candidate) is None:
                 return candidate
         raise AccountNumberGenerationError(
             "Could not generate a unique account number; please retry"

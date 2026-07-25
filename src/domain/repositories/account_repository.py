@@ -11,8 +11,8 @@ from domain.value_objects.account_number import AccountNumber
 class AccountRepository(ABC):
     """Persistence abstraction for the :class:`Account` aggregate.
 
-    Implementations live in the infrastructure layer and are accessed through
-    the :class:`UnitOfWork` so they share its transaction.
+    Implementations live in the infrastructure layer. Writes performed inside a
+    ``TransactionManager.atomic()`` block are committed together.
     """
 
     @abstractmethod
