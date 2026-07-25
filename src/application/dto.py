@@ -21,6 +21,22 @@ class RegisterUserCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class LoginCommand:
+    """Input for the Login use case."""
+
+    email: str
+    password: str
+
+
+@dataclass(frozen=True, slots=True)
+class TokenDTO:
+    """Output of the Login use case: an OAuth2-style bearer token."""
+
+    access_token: str
+    token_type: str = "bearer"
+
+
+@dataclass(frozen=True, slots=True)
 class AccountDTO:
     id: UUID
     account_number: str

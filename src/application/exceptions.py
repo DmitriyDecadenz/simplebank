@@ -15,3 +15,11 @@ class EmailAlreadyExistsError(ApplicationError):
 
 class AccountNumberGenerationError(ApplicationError):
     """Raised when a unique account number could not be generated."""
+
+
+class InvalidCredentialsError(ApplicationError):
+    """Raised when authentication fails (unknown email or wrong password).
+
+    Intentionally does not disclose which of the two failed to avoid user
+    enumeration.
+    """
