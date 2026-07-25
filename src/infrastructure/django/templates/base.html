@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}SimpleBank{% endblock %}</title>
+  <style>
+    :root {
+      --bg1: #6d5efc;
+      --bg2: #3b2bd0;
+      --card: #ffffff;
+      --ink: #1a1a2e;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #6d5efc;
+      --ok: #0f9d58;
+      --err: #d93025;
+      --credit: #0f9d58;
+      --debit: #d93025;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(135deg, var(--bg1), var(--bg2));
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .card {
+      background: var(--card);
+      width: 100%;
+      max-width: 460px;
+      border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      padding: 32px;
+    }
+    .card.wide { max-width: 760px; }
+    .brand {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      margin: 0 0 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .brand .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+    h2 { margin: 0 0 20px; font-size: 20px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+    input {
+      width: 100%; padding: 12px 14px; border: 1px solid var(--line);
+      border-radius: 10px; font-size: 15px; outline: none; transition: border-color .15s;
+    }
+    input:focus { border-color: var(--accent); }
+    button {
+      width: 100%; margin-top: 22px; padding: 13px; border: none; border-radius: 10px;
+      background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: filter .15s;
+    }
+    button:hover { filter: brightness(1.05); }
+    button.secondary { background: #eef0f6; color: var(--ink); }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .link { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .footer { margin-top: 18px; text-align: center; font-size: 14px; }
+    .msg { margin-top: 16px; padding: 11px 14px; border-radius: 10px; font-size: 14px; display: none; }
+    .msg.show { display: block; }
+    .msg.err { background: #fde8e6; color: var(--err); }
+    .msg.ok { background: #e6f4ea; color: var(--ok); }
+    .balance {
+      background: linear-gradient(135deg, var(--bg1), var(--bg2)); color: #fff;
+      border-radius: 14px; padding: 20px; margin-bottom: 22px;
+    }
+    .balance .amount { font-size: 32px; font-weight: 800; letter-spacing: -.02em; }
+    .balance .label { opacity: .85; font-size: 13px; }
+    .balance .acc { margin-top: 8px; font-size: 14px; opacity: .9; font-variant-numeric: tabular-nums; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .topbar button { width: auto; margin: 0; padding: 8px 14px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    td.amount { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .tag.CREDIT { background: #e6f4ea; color: var(--credit); }
+    .tag.DEBIT { background: #fde8e6; color: var(--debit); }
+    .section-title { font-size: 15px; font-weight: 700; margin: 26px 0 6px; }
+    .empty { color: var(--muted); font-size: 14px; padding: 16px 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="card {% block card_class %}{% endblock %}">
+    <div class="brand"><span class="dot"></span> SimpleBank</div>
+    {% block content %}{% endblock %}
+  </div>
+  {% block script %}{% endblock %}
+</body>
+</html>

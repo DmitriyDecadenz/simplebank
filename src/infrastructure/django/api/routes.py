@@ -14,6 +14,7 @@ from ninja import Query, Router
 
 from application.dto import LoginCommand, RegisterUserCommand, TransferMoneyCommand
 from application.queries.get_balance import GetBalance, GetBalanceQuery
+from application.queries.list_accounts import ListAccounts, ListAccountsQuery
 from application.queries.list_transactions import (
     ListTransactions,
     ListTransactionsQuery,
@@ -65,6 +66,23 @@ async def login(request, payload: LoginIn):
             LoginCommand(email=payload.email, password=payload.password)
         )
     return TokenOut(access_token=dto.access_token, token_type=dto.token_type)
+
+
+@router.get("/accounts", response=list[AccountOut], auth=JWTAuth())
+async def list_accounts(request):
+    owner_id = UUID(str(request.auth))
+    async with container(scope=Scope.REQUEST) as request_container:
+        query = await request_container.get(ListAccounts)
+        items = await query.execute(ListAccountsQuery(owner_id=owner_id))
+    return [
+        AccountOut(
+            id=item.id,
+            account_number=item.account_number,
+            balance=item.balance,
+            currency=item.currency,
+        )
+        for item in items
+    ]
 
 
 @router.get(

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Вход — SimpleBank{% endblock %}
+{% block content %}
+  <h2>Вход в аккаунт</h2>
+  <form id="form">
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+    <label for="password">Пароль</label>
+    <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
+    <button type="submit" id="submit">Войти</button>
+  </form>
+  <div id="msg" class="msg err"></div>
+  <div class="footer muted">Нет аккаунта? <a class="link" href="/register">Зарегистрироваться</a></div>
+{% endblock %}
+{% block script %}
+<script>
+{% verbatim %}
+const form = document.getElementById("form");
+const msg = document.getElementById("msg");
+const submit = document.getElementById("submit");
+
+// Already logged in? Go straight to the dashboard.
+if (localStorage.getItem("sb_token")) location.href = "/dashboard";
+
+function showError(text) {
+  msg.textContent = text;
+  msg.className = "msg err show";
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  msg.className = "msg";
+  submit.disabled = true;
+  submit.textContent = "Входим…";
+  try {
+    const res = await fetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showError(data.detail || "Не удалось войти");
+      return;
+    }
+    localStorage.setItem("sb_token", data.access_token);
+    location.href = "/dashboard";
+  } catch (err) {
+    showError("Сеть недоступна");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Войти";
+  }
+});
+{% endverbatim %}
+</script>
+{% endblock %}

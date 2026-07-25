@@ -10,10 +10,31 @@ from datetime import datetime
 from typing import Sequence
 from uuid import UUID
 
-from application.dto import BalanceDTO, TransactionListItemDTO
+from application.dto import AccountDTO, BalanceDTO, TransactionListItemDTO
 from application.queries.get_balance import AccountBalanceReader
+from application.queries.list_accounts import AccountsReader
 from application.queries.list_transactions import TransactionHistoryReader
 from infrastructure.django.apps.bank.models import AccountModel, TransactionModel
+
+
+class DjangoAccountsReader(AccountsReader):
+    async def list_by_owner(self, owner_id: UUID) -> Sequence[AccountDTO]:
+        rows = (
+            AccountModel.objects.filter(owner_id=owner_id)
+            .order_by("account_number")
+            .values("id", "account_number", "balance", "currency")
+        )
+        accounts: list[AccountDTO] = []
+        async for row in rows:
+            accounts.append(
+                AccountDTO(
+                    id=row["id"],
+                    account_number=row["account_number"],
+                    balance=row["balance"],
+                    currency=row["currency"],
+                )
+            )
+        return accounts
 
 
 class DjangoAccountBalanceReader(AccountBalanceReader):

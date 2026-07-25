@@ -11,10 +11,13 @@ Set the ``SIMPLEBANK_SQLITE`` env var to run against a local SQLite database
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from infrastructure.config import load_settings
 
 _settings = load_settings()
+
+_BASE_DIR = Path(__file__).resolve().parent
 
 SECRET_KEY = _settings.auth.secret_key
 DEBUG = _settings.app.environment.lower() in {"local", "dev", "development"}
@@ -28,6 +31,16 @@ INSTALLED_APPS = [
 MIDDLEWARE: list[str] = []
 
 ROOT_URLCONF = "infrastructure.django.urls"
+
+# Server-rendered pages (the thin HTML UI) are loaded from this directory.
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [_BASE_DIR / "templates"],
+        "APP_DIRS": False,
+        "OPTIONS": {"context_processors": []},
+    }
+]
 
 if os.environ.get("SIMPLEBANK_SQLITE"):
     DATABASES = {

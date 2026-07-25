@@ -11,6 +11,7 @@ from __future__ import annotations
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 
 from application.queries.get_balance import AccountBalanceReader, GetBalance
+from application.queries.list_accounts import AccountsReader, ListAccounts
 from application.queries.list_transactions import (
     ListTransactions,
     TransactionHistoryReader,
@@ -27,6 +28,7 @@ from domain.repositories.user_repository import UserRepository
 from infrastructure.config import Settings, load_settings
 from infrastructure.django.persistence.read_models import (
     DjangoAccountBalanceReader,
+    DjangoAccountsReader,
     DjangoTransactionHistoryReader,
 )
 from infrastructure.django.persistence.repositories import (
@@ -55,6 +57,10 @@ class AppProvider(Provider):
             algorithm=settings.auth.algorithm,
             access_token_expire_minutes=settings.auth.access_token_expire_minutes,
         )
+
+    @provide(scope=Scope.APP)
+    def accounts_reader(self) -> AccountsReader:
+        return DjangoAccountsReader()
 
     @provide(scope=Scope.APP)
     def account_balance_reader(self) -> AccountBalanceReader:
@@ -116,6 +122,10 @@ class AppProvider(Provider):
         transaction_manager: TransactionManager,
     ) -> TransferMoney:
         return TransferMoney(accounts, transactions, transaction_manager)
+
+    @provide(scope=Scope.REQUEST)
+    def list_accounts(self, reader: AccountsReader) -> ListAccounts:
+        return ListAccounts(reader)
 
     @provide(scope=Scope.REQUEST)
     def get_balance(self, reader: AccountBalanceReader) -> GetBalance:

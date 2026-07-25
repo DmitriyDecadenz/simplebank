@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Личный кабинет — SimpleBank{% endblock %}
+{% block card_class %}wide{% endblock %}
+{% block content %}
+  <div class="topbar">
+    <h2 style="margin:0">Личный кабинет</h2>
+    <button class="secondary" id="logout">Выйти</button>
+  </div>
+
+  <div class="balance">
+    <div class="label">Баланс счёта</div>
+    <div class="amount" id="balance">—</div>
+    <div class="acc">Счёт: <span id="accNumber">—</span></div>
+    <div id="accPicker" style="margin-top:10px; display:none">
+      <select id="accSelect" style="width:auto; padding:6px 10px; border-radius:8px; border:none"></select>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="section-title">Перевод</div>
+      <form id="transferForm">
+        <label for="to">Номер счёта получателя</label>
+        <input id="to" inputmode="numeric" required placeholder="10 цифр" />
+        <label for="amount">Сумма (EUR)</label>
+        <input id="amount" type="number" step="0.01" min="0.01" required placeholder="0.00" />
+        <button type="submit" id="transferBtn">Перевести</button>
+      </form>
+      <div id="msg" class="msg"></div>
+      <p class="muted" style="margin-top:14px">Комиссия: 2.5% от суммы, минимум €5.</p>
+    </div>
+
+    <div>
+      <div class="section-title">История операций</div>
+      <div id="txWrap">
+        <table>
+          <thead>
+            <tr><th>Дата</th><th>Тип</th><th style="text-align:right">Сумма</th></tr>
+          </thead>
+          <tbody id="txBody"></tbody>
+        </table>
+        <div class="empty" id="txEmpty" style="display:none">Операций пока нет.</div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block script %}
+<script>
+{% verbatim %}
+const token = localStorage.getItem("sb_token");
+if (!token) location.href = "/";
+
+const state = { accounts: [], current: null };
+
+const els = {
+  balance: document.getElementById("balance"),
+  accNumber: document.getElementById("accNumber"),
+  accPicker: document.getElementById("accPicker"),
+  accSelect: document.getElementById("accSelect"),
+  txBody: document.getElementById("txBody"),
+  txEmpty: document.getElementById("txEmpty"),
+  msg: document.getElementById("msg"),
+  transferForm: document.getElementById("transferForm"),
+  transferBtn: document.getElementById("transferBtn"),
+};
+
+function logout() {
+  localStorage.removeItem("sb_token");
+  location.href = "/";
+}
+document.getElementById("logout").addEventListener("click", logout);
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+      ...(options.headers || {}),
+    },
+  });
+  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "Ошибка запроса");
+  return data;
+}
+
+function fmtMoney(v, ccy) {
+  return Number(v).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + ccy;
+}
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function renderBalance() {
+  const a = state.current;
+  els.balance.textContent = fmtMoney(a.balance, a.currency);
+  els.accNumber.textContent = a.account_number;
+}
+
+async function loadAccounts() {
+  state.accounts = await api("/accounts");
+  if (!state.accounts.length) { els.balance.textContent = "Нет счёта"; return; }
+  state.current = state.accounts[0];
+  if (state.accounts.length > 1) {
+    els.accPicker.style.display = "block";
+    els.accSelect.innerHTML = state.accounts
+      .map((a, i) => `<option value="${i}">${a.account_number}</option>`)
+      .join("");
+    els.accSelect.addEventListener("change", async () => {
+      state.current = state.accounts[Number(els.accSelect.value)];
+      renderBalance();
+      await loadTransactions();
+    });
+  }
+  renderBalance();
+  await loadTransactions();
+}
+
+async function loadTransactions() {
+  const items = await api(`/accounts/${state.current.id}/transactions`);
+  els.txBody.innerHTML = "";
+  els.txEmpty.style.display = items.length ? "none" : "block";
+  for (const t of items) {
+    const sign = t.type === "DEBIT" ? "−" : "+";
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${fmtDate(t.created_at)}</td>` +
+      `<td><span class="tag ${t.type}">${t.type === "DEBIT" ? "Списание" : "Зачисление"}</span></td>` +
+      `<td class="amount">${sign} ${fmtMoney(t.amount, t.currency)}</td>`;
+    els.txBody.appendChild(tr);
+  }
+}
+
+function showMsg(text, ok) {
+  els.msg.textContent = text;
+  els.msg.className = "msg show " + (ok ? "ok" : "err");
+}
+
+els.transferForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.msg.className = "msg";
+  els.transferBtn.disabled = true;
+  els.transferBtn.textContent = "Переводим…";
+  try {
+    const r = await api(`/accounts/${state.current.id}/transfers`, {
+      method: "POST",
+      body: JSON.stringify({
+        to_account_number: document.getElementById("to").value.trim(),
+        amount: document.getElementById("amount").value,
+        currency: state.current.currency,
+      }),
+    });
+    showMsg(`Переведено ${fmtMoney(r.amount, r.currency)} (комиссия ${fmtMoney(r.fee, r.currency)}). Списано ${fmtMoney(r.total_debited, r.currency)}.`, true);
+    els.transferForm.reset();
+    // Refresh balance from the transfer result and reload history.
+    state.current.balance = r.from_balance;
+    renderBalance();
+    await loadTransactions();
+  } catch (err) {
+    showMsg(err.message, false);
+  } finally {
+    els.transferBtn.disabled = false;
+    els.transferBtn.textContent = "Перевести";
+  }
+});
+
+loadAccounts().catch((e) => showMsg(e.message, false));
+{% endverbatim %}
+</script>
+{% endblock %}
