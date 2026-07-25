@@ -12,10 +12,10 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Self
 
-from src.domain.repositories.validation_history_repository import (
-    ValidationHistoryRepository,
-)
-from src.domain.repositories.validation_rule_repository import ValidationRuleRepository
+from domain.repositories.account_repository import AccountRepository
+from domain.repositories.outbox_repository import OutboxRepository
+from domain.repositories.transaction_repository import TransactionRepository
+from domain.repositories.user_repository import UserRepository
 
 
 class AbstractUnitOfWork(ABC):
@@ -24,15 +24,20 @@ class AbstractUnitOfWork(ABC):
     Usage::
 
         async with uow:
-            await uow.validation_rule.add(aggregate)
+            account = await uow.accounts.get_by_id(account_id)
+            transaction = account.deposit(amount)
+            await uow.transactions.add(transaction)
+            await uow.accounts.update(account)
             await uow.commit()
 
     Leaving the context manager without an explicit :meth:`commit` rolls the
     transaction back, guaranteeing atomicity.
     """
 
-    validation_rule: ValidationRuleRepository
-    validation_history: ValidationHistoryRepository
+    users: UserRepository
+    accounts: AccountRepository
+    transactions: TransactionRepository
+    outbox: OutboxRepository
 
     async def __aenter__(self) -> Self:
         """Enter the transactional context."""
