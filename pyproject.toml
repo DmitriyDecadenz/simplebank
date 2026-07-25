@@ -1,9 +1,9 @@
 [project]
-name = "template"
+name = "simplebank"
 version = "0.1.0"
-description = "Base template for microservice with FastAPI"
+description = "Simple Bank"
 authors = [
-    { name = "Your Name", email = "you@example.com" }
+    { name = "Dimitri Khubulashvili", email = "dima.hubul@icloud.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,7 +27,4 @@ packages = [
     { include = "src" }
 ]
 
-[[tool.poetry.source]]
-name = "sogaz"
-url = "https://nexus.sogaz.ru/repository/pypi-group/simple"
-priority = "primary"
+
