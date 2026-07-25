@@ -87,6 +87,21 @@ class RabbitMqSettings(BaseSettings):
         return f"amqp://{self.user}:{self.password}@{self.host}:{self.port}/"
 
 
+class AuthSettings(BaseSettings):
+    """JWT authentication settings."""
+
+    model_config = SettingsConfigDict(env_prefix="AUTH__", extra="ignore")
+
+    secret_key: str = Field(
+        default="change-me-in-production",
+        description="HMAC secret used to sign access tokens.",
+    )
+    algorithm: str = Field(default="HS256", description="JWT signing algorithm.")
+    access_token_expire_minutes: int = Field(
+        default=30, ge=1, description="Access token lifetime in minutes."
+    )
+
+
 class CorsSettings(BaseSettings):
     """CORS settings."""
 
@@ -108,6 +123,7 @@ class Settings(BaseSettings):
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
     rabbit: RabbitMqSettings = Field(default_factory=RabbitMqSettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
 
 def load_settings() -> Settings:

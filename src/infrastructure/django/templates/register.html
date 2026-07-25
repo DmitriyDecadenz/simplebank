@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — SimpleBank{% endblock %}
+{% block content %}
+  <h2>Создать аккаунт</h2>
+  <p class="muted">При регистрации автоматически открывается счёт с приветственным бонусом €10 000.</p>
+  <form id="form">
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+    <label for="password">Пароль</label>
+    <input id="password" type="password" autocomplete="new-password" required minlength="6" placeholder="минимум 6 символов" />
+    <button type="submit" id="submit">Зарегистрироваться</button>
+  </form>
+  <div id="msg" class="msg"></div>
+  <div class="footer muted">Уже есть аккаунт? <a class="link" href="/">Войти</a></div>
+{% endblock %}
+{% block script %}
+<script>
+{% verbatim %}
+const form = document.getElementById("form");
+const msg = document.getElementById("msg");
+const submit = document.getElementById("submit");
+
+if (localStorage.getItem("sb_token")) location.href = "/dashboard";
+
+function show(text, ok) {
+  msg.textContent = text;
+  msg.className = "msg show " + (ok ? "ok" : "err");
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  msg.className = "msg";
+  submit.disabled = true;
+  submit.textContent = "Создаём…";
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    const res = await fetch("/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      show(data.detail || "Не удалось зарегистрироваться", false);
+      return;
+    }
+    show("Счёт " + data.account.account_number + " открыт. Входим…", true);
+    // Auto-login for a smooth flow.
+    const loginRes = await fetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const loginData = await loginRes.json().catch(() => ({}));
+    if (loginRes.ok) {
+      localStorage.setItem("sb_token", loginData.access_token);
+      location.href = "/dashboard";
+    } else {
+      location.href = "/";
+    }
+  } catch (err) {
+    show("Сеть недоступна", false);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Зарегистрироваться";
+  }
+});
+{% endverbatim %}
+</script>
+{% endblock %}
