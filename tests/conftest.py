@@ -28,23 +28,57 @@ from domain.value_objects.money import Money
 from domain.value_objects.password_hash import PasswordHash
 
 
-class FakeTransactionManager(TransactionManager):
-    """Records how the atomic boundary is used.
+class FakeAtomicContext:
+    """In-memory stand-in for the locking transactional context."""
 
-    ``committed`` flips to ``True`` only when the ``atomic()`` block exits
-    cleanly; if the body raises, it stays ``False`` - mirroring the "no partial
-    commits" guarantee of the real implementation.
+    def __init__(self, manager: "FakeTransactionManager") -> None:
+        self._m = manager
+
+    def find_account_id_by_number(self, account_number) -> UUID | None:
+        account = self._m.accounts_by_number.get(str(account_number))
+        return account.id if account else None
+
+    def get_account_for_update(self, account_id: UUID):
+        return self._m.accounts_by_id.get(account_id)
+
+    def save_account(self, account) -> None:
+        self._m.saved_accounts.append(account)
+
+    def add_transaction(self, transaction) -> None:
+        self._m.added_transactions.append(transaction)
+
+
+class FakeTransactionManager(TransactionManager):
+    """Records how the atomic boundaries are used.
+
+    ``committed`` flips to ``True`` only when the ``atomic()`` block or the
+    ``run()`` unit of work completes cleanly; if the body raises, it stays
+    ``False`` - mirroring the "no partial commits" guarantee.
     """
 
     def __init__(self) -> None:
         self.entered = False
         self.committed = False
+        self.accounts_by_id: dict[UUID, Account] = {}
+        self.accounts_by_number: dict[str, Account] = {}
+        self.saved_accounts: list[Account] = []
+        self.added_transactions: list[Transaction] = []
+
+    def preload_account(self, account: Account) -> None:
+        self.accounts_by_id[account.id] = account
+        self.accounts_by_number[str(account.account_number)] = account
 
     @asynccontextmanager
     async def atomic(self) -> AsyncIterator[None]:
         self.entered = True
         yield
         self.committed = True
+
+    async def run(self, work):
+        self.entered = True
+        result = work(FakeAtomicContext(self))
+        self.committed = True
+        return result
 
 
 class InMemoryUserRepository(UserRepository):

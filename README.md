@@ -142,7 +142,6 @@ uv run uvicorn infrastructure.django.asgi:application --host 0.0.0.0 --port 8000
 | `AUTH__ALGORITHM` | `HS256` | Алгоритм JWT |
 | `AUTH__ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Время жизни токена |
 
-> В проде обязательно смените `AUTH__SECRET_KEY`.
 
 ## API
 

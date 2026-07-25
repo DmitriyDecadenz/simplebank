@@ -116,12 +116,9 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def transfer_money(
-        self,
-        accounts: AccountRepository,
-        transactions: TransactionRepository,
-        transaction_manager: TransactionManager,
+        self, transaction_manager: TransactionManager
     ) -> TransferMoney:
-        return TransferMoney(accounts, transactions, transaction_manager)
+        return TransferMoney(transaction_manager)
 
     @provide(scope=Scope.REQUEST)
     def list_accounts(self, reader: AccountsReader) -> ListAccounts:

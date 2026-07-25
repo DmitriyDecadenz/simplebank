@@ -1,4 +1,8 @@
-"""Unit tests for the TransferMoney use case (transfer, fee, insufficient funds)."""
+"""Unit tests for the TransferMoney use case (transfer, fee, insufficient funds).
+
+The critical section runs through ``TransactionManager.run``; here it is backed
+by an in-memory locking context (see ``FakeTransactionManager``).
+"""
 
 from __future__ import annotations
 
@@ -15,22 +19,22 @@ from domain.exceptions import InsufficientFundsError
 
 
 @pytest.fixture
-def use_case(accounts, transactions, transaction_manager):
-    return TransferMoney(accounts, transactions, transaction_manager)
+def use_case(transaction_manager):
+    return TransferMoney(transaction_manager)
 
 
-def _setup(accounts, *, sender_balance="10000"):
+def _setup(tm, *, sender_balance="10000"):
     sender = make_account(number="1111111111", balance=sender_balance)
     recipient = make_account(number="2222222222", balance="0")
-    accounts.preload(sender)
-    accounts.preload(recipient)
+    tm.preload_account(sender)
+    tm.preload_account(recipient)
     return sender, recipient
 
 
 async def test_transfer_moves_amount_and_charges_percentage_fee(
-    use_case, accounts, transactions, transaction_manager
+    use_case, transaction_manager
 ):
-    sender, recipient = _setup(accounts)
+    sender, recipient = _setup(transaction_manager)
 
     dto = await use_case.execute(
         TransferMoneyCommand(
@@ -48,14 +52,18 @@ async def test_transfer_moves_amount_and_charges_percentage_fee(
     assert dto.to_balance == Decimal("1000.00")
 
     # One DEBIT (amount + fee) and one CREDIT (amount) recorded.
-    assert len(transactions.added) == 2
-    debit = next(t for t in transactions.added if t.type is TransactionType.DEBIT)
-    credit = next(t for t in transactions.added if t.type is TransactionType.CREDIT)
+    assert len(transaction_manager.added_transactions) == 2
+    debit = next(
+        t for t in transaction_manager.added_transactions if t.type is TransactionType.DEBIT
+    )
+    credit = next(
+        t for t in transaction_manager.added_transactions if t.type is TransactionType.CREDIT
+    )
     assert debit.amount.amount == Decimal("1025.00")
     assert credit.amount.amount == Decimal("1000.00")
 
-    # Both balances updated inside a single committed atomic block.
-    assert len(accounts.updated) == 2
+    # Both balances saved inside a committed transaction.
+    assert len(transaction_manager.saved_accounts) == 2
     assert transaction_manager.entered and transaction_manager.committed
 
 
@@ -68,8 +76,8 @@ async def test_transfer_moves_amount_and_charges_percentage_fee(
         ("40", "5.00"),  # tiny transfer still pays €5
     ],
 )
-async def test_transfer_fee_policy(use_case, accounts, amount, expected_fee):
-    sender, _ = _setup(accounts)
+async def test_transfer_fee_policy(use_case, transaction_manager, amount, expected_fee):
+    sender, _ = _setup(transaction_manager)
 
     dto = await use_case.execute(
         TransferMoneyCommand(
@@ -86,10 +94,10 @@ async def test_transfer_fee_policy(use_case, accounts, amount, expected_fee):
 
 
 async def test_transfer_rejects_insufficient_funds_atomically(
-    use_case, accounts, transactions, transaction_manager
+    use_case, transaction_manager
 ):
     # Balance can't cover amount + fee (100 + 5 = 105 > 100).
-    sender, recipient = _setup(accounts, sender_balance="100")
+    sender, recipient = _setup(transaction_manager, sender_balance="100")
     before_sender = sender.balance
     before_recipient = recipient.balance
 
@@ -102,16 +110,16 @@ async def test_transfer_rejects_insufficient_funds_atomically(
             )
         )
 
-    # Nothing persisted, no commit, balances untouched (rolled back in-memory).
-    assert transactions.added == []
-    assert accounts.updated == []
+    # Nothing persisted, no commit, balances untouched.
+    assert transaction_manager.added_transactions == []
+    assert transaction_manager.saved_accounts == []
     assert transaction_manager.committed is False
     assert sender.balance == before_sender
     assert recipient.balance == before_recipient
 
 
-async def test_transfer_unknown_sender(use_case, accounts):
-    _setup(accounts)
+async def test_transfer_unknown_sender(use_case, transaction_manager):
+    _setup(transaction_manager)
     from uuid import uuid4
 
     with pytest.raises(AccountNotFoundError):
@@ -124,8 +132,8 @@ async def test_transfer_unknown_sender(use_case, accounts):
         )
 
 
-async def test_transfer_unknown_recipient(use_case, accounts):
-    sender, _ = _setup(accounts)
+async def test_transfer_unknown_recipient(use_case, transaction_manager):
+    sender, _ = _setup(transaction_manager)
 
     with pytest.raises(AccountNotFoundError):
         await use_case.execute(
@@ -137,8 +145,8 @@ async def test_transfer_unknown_recipient(use_case, accounts):
         )
 
 
-async def test_transfer_to_same_account_rejected(use_case, accounts):
-    sender, _ = _setup(accounts)
+async def test_transfer_to_same_account_rejected(use_case, transaction_manager):
+    sender, _ = _setup(transaction_manager)
 
     with pytest.raises(SameAccountTransferError):
         await use_case.execute(
