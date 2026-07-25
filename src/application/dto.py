@@ -38,6 +38,34 @@ class TokenDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class TransferMoneyCommand:
+    """Input for the TransferMoney use case.
+
+    The sender is identified by its account id (typically the authenticated
+    account), the recipient by its public account number.
+    """
+
+    from_account_id: UUID
+    to_account_number: str
+    amount: Decimal
+    currency: str = "EUR"
+
+
+@dataclass(frozen=True, slots=True)
+class TransferResultDTO:
+    """Outcome of a completed transfer."""
+
+    from_account_number: str
+    to_account_number: str
+    amount: Decimal
+    fee: Decimal
+    total_debited: Decimal
+    currency: str
+    from_balance: Decimal
+    to_balance: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class AccountDTO:
     id: UUID
     account_number: str

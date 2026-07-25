@@ -43,6 +43,23 @@ class BalanceOut(Schema):
     currency: str
 
 
+class TransferIn(Schema):
+    to_account_number: str
+    amount: Decimal
+    currency: str = "EUR"
+
+
+class TransferOut(Schema):
+    from_account_number: str
+    to_account_number: str
+    amount: Decimal
+    fee: Decimal
+    total_debited: Decimal
+    currency: str
+    from_balance: Decimal
+    to_balance: Decimal
+
+
 class TransactionOut(Schema):
     amount: Decimal
     currency: str

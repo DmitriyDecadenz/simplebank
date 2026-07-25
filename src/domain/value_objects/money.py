@@ -67,6 +67,13 @@ class Money:
         # Money is non-negative by invariant; a negative result raises.
         return Money(self.amount - other.amount, self.currency)
 
+    def multiply(self, factor: Decimal | int | str) -> "Money":
+        """Scale the amount by ``factor`` (e.g. a fee rate), keeping the currency.
+
+        The result is quantized to cents by :meth:`__post_init__`.
+        """
+        return Money(self.amount * Decimal(factor), self.currency)
+
     def __lt__(self, other: "Money") -> bool:
         self._ensure_same_currency(other)
         return self.amount < other.amount

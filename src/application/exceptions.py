@@ -21,6 +21,10 @@ class AccountNotFoundError(ApplicationError):
     """Raised when a requested account does not exist."""
 
 
+class SameAccountTransferError(ApplicationError):
+    """Raised when a transfer would move money from an account to itself."""
+
+
 class InvalidCredentialsError(ApplicationError):
     """Raised when authentication fails (unknown email or wrong password).
 

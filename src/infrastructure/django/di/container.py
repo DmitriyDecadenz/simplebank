@@ -18,6 +18,7 @@ from application.queries.list_transactions import (
 from application.transaction import TransactionManager
 from application.usecases.login import Login
 from application.usecases.register_user import RegisterUser
+from application.usecases.transfer_money import TransferMoney
 from domain.ports.password_hasher import PasswordHasher
 from domain.ports.token_service import TokenService
 from domain.repositories.account_repository import AccountRepository
@@ -106,6 +107,15 @@ class AppProvider(Provider):
         token_service: TokenService,
     ) -> Login:
         return Login(users, password_hasher, token_service)
+
+    @provide(scope=Scope.REQUEST)
+    def transfer_money(
+        self,
+        accounts: AccountRepository,
+        transactions: TransactionRepository,
+        transaction_manager: TransactionManager,
+    ) -> TransferMoney:
+        return TransferMoney(accounts, transactions, transaction_manager)
 
     @provide(scope=Scope.REQUEST)
     def get_balance(self, reader: AccountBalanceReader) -> GetBalance:

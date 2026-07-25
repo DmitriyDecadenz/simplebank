@@ -12,7 +12,7 @@ from uuid import UUID
 from dishka import Scope
 from ninja import Query, Router
 
-from application.dto import LoginCommand, RegisterUserCommand
+from application.dto import LoginCommand, RegisterUserCommand, TransferMoneyCommand
 from application.queries.get_balance import GetBalance, GetBalanceQuery
 from application.queries.list_transactions import (
     ListTransactions,
@@ -20,6 +20,7 @@ from application.queries.list_transactions import (
 )
 from application.usecases.login import Login
 from application.usecases.register_user import RegisterUser
+from application.usecases.transfer_money import TransferMoney
 from infrastructure.django.api.auth import JWTAuth
 from infrastructure.django.api.schemas import (
     AccountOut,
@@ -28,6 +29,8 @@ from infrastructure.django.api.schemas import (
     RegisterIn,
     TokenOut,
     TransactionOut,
+    TransferIn,
+    TransferOut,
     UserOut,
 )
 from infrastructure.django.di.container import container
@@ -75,6 +78,32 @@ async def get_balance(request, account_id: UUID):
         account_number=dto.account_number,
         balance=dto.balance,
         currency=dto.currency,
+    )
+
+
+@router.post(
+    "/accounts/{account_id}/transfers", response=TransferOut, auth=JWTAuth()
+)
+async def transfer_money(request, account_id: UUID, payload: TransferIn):
+    async with container(scope=Scope.REQUEST) as request_container:
+        use_case = await request_container.get(TransferMoney)
+        dto = await use_case.execute(
+            TransferMoneyCommand(
+                from_account_id=account_id,
+                to_account_number=payload.to_account_number,
+                amount=payload.amount,
+                currency=payload.currency,
+            )
+        )
+    return TransferOut(
+        from_account_number=dto.from_account_number,
+        to_account_number=dto.to_account_number,
+        amount=dto.amount,
+        fee=dto.fee,
+        total_debited=dto.total_debited,
+        currency=dto.currency,
+        from_balance=dto.from_balance,
+        to_balance=dto.to_balance,
     )
 
 
