@@ -7,10 +7,12 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.application.unit_of_work import AbstractUnitOfWork
-from src.infrastructure.db.sqlalchemy.repositories import (
-    SqlAlchemyValidationRuleRepository,
-    SqlAlchemyValidationHistoryRepository,
+from application.unit_of_work import AbstractUnitOfWork
+from infrastructure.database.sqlalchemy.repositories import (
+    SqlAlchemyAccountRepository,
+    SqlAlchemyOutboxRepository,
+    SqlAlchemyTransactionRepository,
+    SqlAlchemyUserRepository,
 )
 
 
@@ -22,8 +24,10 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
     participates in one atomic transaction.
     """
 
-    validation_rule: SqlAlchemyValidationRuleRepository
-    validation_history: SqlAlchemyValidationHistoryRepository
+    users: SqlAlchemyUserRepository
+    accounts: SqlAlchemyAccountRepository
+    transactions: SqlAlchemyTransactionRepository
+    outbox: SqlAlchemyOutboxRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """Initialise the UoW with a session factory.
@@ -32,13 +36,15 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
             session_factory: Factory producing fresh async sessions per scope.
         """
         self._session_factory = session_factory
-        self._session: AsyncSession | None = None
+        self._session: AsyncSession
 
     async def __aenter__(self) -> Self:
         """Open a session and wire up the repositories for this scope."""
         self._session = self._session_factory()
-        # init your repositories
-        # self.your_repository = SqlAlchemyYourRepository(self._session)
+        self.users = SqlAlchemyUserRepository(self._session)
+        self.accounts = SqlAlchemyAccountRepository(self._session)
+        self.transactions = SqlAlchemyTransactionRepository(self._session)
+        self.outbox = SqlAlchemyOutboxRepository(self._session)
         return self
 
     async def __aexit__(

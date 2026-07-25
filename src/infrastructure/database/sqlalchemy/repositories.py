@@ -1,92 +1,122 @@
-from datetime import datetime, UTC
+"""SQLAlchemy implementations of the domain repository interfaces.
+
+Every repository operates on an ``AsyncSession`` provided by the Unit of Work,
+so all of their reads and writes participate in the same transaction. They
+contain persistence logic only and delegate ORM<->domain translation to the
+mappers module.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
 from typing import Sequence
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.entities.account import Account
 from domain.entities.outbox import OutboxMessage
+from domain.entities.transaction import Transaction
+from domain.entities.user import User
 from domain.event import DomainEvent
-from infrastructure.database.sqlalchemy.models import OutboxModel
+from domain.repositories.account_repository import AccountRepository
+from domain.repositories.outbox_repository import OutboxRepository
+from domain.repositories.transaction_repository import TransactionRepository
+from domain.repositories.user_repository import UserRepository
+from domain.value_objects.account_number import AccountNumber
+from domain.value_objects.email import Email
+from infrastructure.database.sqlalchemy.mappers import (
+    account_to_domain,
+    account_to_model,
+    transaction_to_domain,
+    transaction_to_model,
+    user_to_domain,
+    user_to_model,
+)
+from infrastructure.database.sqlalchemy.models import (
+    AccountModel,
+    OutboxModel,
+    TransactionModel,
+    UserModel,
+)
 
 
-def _to_domain(model: ValidationRuleModel) -> ValidationRuleConfig:
-    return ValidationRuleConfig(
-        code=model.code,
-        operation=ValidationOperation(model.operation),
-        enabled=model.enabled,
-        priority=model.priority,
-        stop_on_fail=model.stop_on_fail,
-        notification_type=model.notification_type,
-        title=model.title,
-        message=model.message,
-        parameters={p.parameter_name: p.parameter_value for p in model.parameters},
-    )
-
-
-class SqlAlchemyExampleRepository(ValidationRuleRepository):
-    """Deprecated EXAMPLE Реализация ValidationRuleRepository на SQLAlchemy."""
-
+class SqlAlchemyUserRepository(UserRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_by_operation(
-        self, operation: ValidationOperation
-    ) -> list[ValidationRuleConfig]:
-        stmt = (
-            select(ValidationRuleModel)
-            .where(ValidationRuleModel.operation == operation.value)
-            .options(selectinload(ValidationRuleModel.parameters))
-            .order_by(ValidationRuleModel.priority)
-        )
-        result = await self._session.execute(stmt)
-        return [_to_domain(row) for row in result.scalars().all()]
+    async def add(self, user: User) -> None:
+        self._session.add(user_to_model(user))
 
-    async def get_all(self) -> list[ValidationRuleConfig]:
-        stmt = (
-            select(ValidationRuleModel)
-            .options(selectinload(ValidationRuleModel.parameters))
-            .order_by(ValidationRuleModel.operation, ValidationRuleModel.priority)
-        )
-        result = await self._session.execute(stmt)
-        return [_to_domain(row) for row in result.scalars().all()]
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        model = await self._session.get(UserModel, user_id)
+        return user_to_domain(model) if model else None
 
-    async def get_by_code(self, code: str) -> ValidationRuleConfig | None:
-        stmt = (
-            select(ValidationRuleModel)
-            .where(ValidationRuleModel.code == code)
-            .options(selectinload(ValidationRuleModel.parameters))
+    async def get_by_email(self, email: Email) -> User | None:
+        result = await self._session.execute(
+            select(UserModel).where(UserModel.email == str(email))
         )
-        result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
-        return _to_domain(model) if model else None
+        return user_to_domain(model) if model else None
 
-    async def update(self, config: ValidationRuleConfig) -> ValidationRuleConfig:
-        stmt = (
-            select(ValidationRuleModel)
-            .where(ValidationRuleModel.code == config.code)
-            .options(selectinload(ValidationRuleModel.parameters))
+    async def exists_by_email(self, email: Email) -> bool:
+        result = await self._session.execute(
+            select(exists().where(UserModel.email == str(email)))
         )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one()
-        model.enabled = config.enabled
-        model.priority = config.priority
-        model.stop_on_fail = config.stop_on_fail
-        model.notification_type = config.notification_type
-        model.title = config.title
-        model.message = config.message
-        model.parameters.clear()
-        for name, value in config.parameters.items():
-            model.parameters.append(
-                ValidationRuleParameterModel(
-                    id=uuid4(),
-                    rule_code=config.code,
-                    parameter_name=name,
-                    parameter_value=value,
-                )
+        return bool(result.scalar())
+
+
+class SqlAlchemyAccountRepository(AccountRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, account: Account) -> None:
+        self._session.add(account_to_model(account))
+
+    async def update(self, account: Account) -> None:
+        await self._session.merge(account_to_model(account))
+
+    async def get_by_id(self, account_id: UUID) -> Account | None:
+        model = await self._session.get(AccountModel, account_id)
+        return account_to_domain(model) if model else None
+
+    async def get_by_number(self, account_number: AccountNumber) -> Account | None:
+        result = await self._session.execute(
+            select(AccountModel).where(
+                AccountModel.account_number == str(account_number)
             )
-        await self._session.flush()
-        return _to_domain(model)
+        )
+        model = result.scalar_one_or_none()
+        return account_to_domain(model) if model else None
+
+    async def list_by_owner(self, owner_id: UUID) -> Sequence[Account]:
+        result = await self._session.execute(
+            select(AccountModel)
+            .where(AccountModel.owner_id == owner_id)
+            .order_by(AccountModel.account_number)
+        )
+        return [account_to_domain(model) for model in result.scalars().all()]
+
+
+class SqlAlchemyTransactionRepository(TransactionRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, transaction: Transaction) -> None:
+        self._session.add(transaction_to_model(transaction))
+
+    async def get_by_id(self, transaction_id: UUID) -> Transaction | None:
+        model = await self._session.get(TransactionModel, transaction_id)
+        return transaction_to_domain(model) if model else None
+
+    async def list_by_account(self, account_id: UUID) -> Sequence[Transaction]:
+        result = await self._session.execute(
+            select(TransactionModel)
+            .where(TransactionModel.account_id == account_id)
+            .order_by(TransactionModel.created_at)
+        )
+        return [transaction_to_domain(model) for model in result.scalars().all()]
 
 
 class SqlAlchemyOutboxRepository(OutboxRepository):
