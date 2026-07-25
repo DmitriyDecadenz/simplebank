@@ -1,0 +1,33 @@
+[project]
+name = "template"
+version = "0.1.0"
+description = "Base template for microservice with FastAPI"
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dishka>=1.10.1",
+    "dishka-faststream>=0.7.0",
+    "fastapi[standard]>=0.116.1,<0.117.0",
+    "prometheus-fastapi-instrumentator>=7.1.0",
+    "pydantic>=2.11.7,<3.0.0",
+    "redis>=8.0.1",
+    "sqlalchemy>=2.0.51",
+    "structlog>=26.1.0",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    { include = "src" }
+]
+
+[[tool.poetry.source]]
+name = "sogaz"
+url = "https://nexus.sogaz.ru/repository/pypi-group/simple"
+priority = "primary"
