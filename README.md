@@ -13,6 +13,7 @@ HTML-интерфейсом.
 - Просмотр баланса и **истории операций** (с фильтрацией по датам, сортировка DESC).
 - **Переводы** между счетами: комиссия `max(2.5%, €5)`, атомарная запись DEBIT + CREDIT.
 - Тонкий веб-интерфейс (вход, регистрация, кабинет с балансом/историей/переводом).
+- **Django Admin** для просмотра пользователей, счетов и проводок (`/admin/`).
 - Интерактивная OpenAPI-документация (`/docs`).
 
 ## Стек
@@ -89,7 +90,7 @@ src/
     ├── jwt.py / security.py        # JWT, PBKDF2
     └── django/
         ├── settings.py, urls.py, asgi.py
-        ├── apps/bank/models.py     # Django ORM модели + миграции
+        ├── apps/bank/              # Django ORM модели, admin.py, миграции
         ├── persistence/            # мапперы, репозитории, read models, transaction manager
         ├── di/container.py         # dishka
         ├── api/                    # Ninja: routes, schemas, auth, обработчики ошибок
@@ -106,11 +107,13 @@ docker compose up --build
 ```
 
 - Веб-интерфейс: <http://localhost:8000/>
+- Django Admin: <http://localhost:8000/admin/> (логин/пароль из `.env`, по умолчанию `admin` / `admin`)
 - OpenAPI-доки: <http://localhost:8000/docs>
 - PostgreSQL: `localhost:5432`
 
-Миграции применяются автоматически при старте контейнера. Данные БД хранятся в
-volume `pgdata` (полный сброс — `docker compose down -v`).
+Миграции, `collectstatic` и создание суперпользователя админки выполняются
+автоматически при старте контейнера. Данные БД хранятся в volume `pgdata`
+(полный сброс — `docker compose down -v`).
 
 ## Локальный запуск (без Docker)
 
@@ -138,10 +141,14 @@ uv run uvicorn infrastructure.django.asgi:application --host 0.0.0.0 --port 8000
 | `POSTGRES__PORT` | `5432` | Порт БД |
 | `POSTGRES__USER` / `POSTGRES__PASSWORD` / `POSTGRES__DB` | `simplebank` | Доступ к БД |
 | `APP__ENVIRONMENT` | `local` | Имя окружения (влияет на `DEBUG`) |
-| `AUTH__SECRET_KEY` | `change-me-in-production` | Секрет для подписи JWT |
+| `AUTH__SECRET_KEY` | `change-me-in-production` | Секрет для подписи JWT (и Django `SECRET_KEY`) |
 | `AUTH__ALGORITHM` | `HS256` | Алгоритм JWT |
 | `AUTH__ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Время жизни токена |
+| `DJANGO_SUPERUSER_USERNAME` | `admin` | Логин суперпользователя Django Admin |
+| `DJANGO_SUPERUSER_EMAIL` | `admin@example.com` | Email суперпользователя |
+| `DJANGO_SUPERUSER_PASSWORD` | `admin` | Пароль суперпользователя (создаётся при старте, если нет) |
 
+> В проде обязательно смените `AUTH__SECRET_KEY` и `DJANGO_SUPERUSER_PASSWORD`.
 
 ## API
 
@@ -187,6 +194,21 @@ Server-rendered страницы (Django-шаблоны), которые общ�
 - `/` — вход
 - `/register` — регистрация (с авто-входом)
 - `/dashboard` — кабинет: баланс, история операций, форма перевода
+
+## Django Admin
+
+Встроенная админка Django для поддержки и инспекции данных:
+
+- URL: <http://localhost:8000/admin/>
+- Модели: пользователи банка (`UserModel`), счета, транзакции
+- Проводки (ledger) — **только чтение** (нельзя добавлять/менять/удалять через админку)
+- Хеш пароля пользователя — только чтение
+- Правки баланса/пользователя в админке **обходят доменные правила** — это инструмент
+  поддержки, не основной способ операций
+
+Статика админки раздаётся через WhiteNoise под ASGI (`collectstatic` в `entrypoint.sh`).
+Суперпользователь Django (таблица `auth_user`) создаётся отдельно от банковских
+пользователей (`users`) — это два разных аккаунта.
 
 ## Тесты
 
